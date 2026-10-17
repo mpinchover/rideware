@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase/firebase";
+import { matchUrl } from "./public-config";
 import { useRideSession } from "./ride-session";
 
 export default function LoginBar() {
@@ -17,7 +18,7 @@ export default function LoginBar() {
   useEffect(() => {
     if (!ride.userId || !username) return;
     const params = new URLSearchParams({ user_id: ride.userId, name: username });
-    void fetch(`/api/token?${params}`);
+    void fetch(matchUrl(`/chat/token?${params}`));
   }, [ride.userId, username]);
 
   useEffect(() => {

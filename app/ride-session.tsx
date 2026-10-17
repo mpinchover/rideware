@@ -5,10 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase/firebase";
+import { MATCH_SERVER_URL, matchUrl } from "./public-config";
 
-const SERVER_URL = (
-  process.env.NEXT_PUBLIC_MATCH_SERVER_URL ?? "http://127.0.0.1:5050"
-).replace(/\/$/, "");
+const SERVER_URL = MATCH_SERVER_URL.replace(/\/$/, "");
 const AIRPORT_KEY = "rideshare-airport";
 const MATCH_KEY = "rideshare-match";
 const PENDING_KEY = "rideshare-pending";
@@ -232,7 +231,7 @@ export default function RideSession({ children }: { children: ReactNode }) {
 
     const gen = ++lookupGen.current;
     const params = new URLSearchParams({ user_id: userId });
-    fetch(`/api/chat/channel?${params}`)
+    fetch(matchUrl(`/chat/channel?${params}`))
       .then(async (response) => {
         const body: unknown = await response.json().catch(() => null);
         if (!response.ok) throw new Error("Couldn't look up the chat.");
@@ -351,7 +350,7 @@ export default function RideSession({ children }: { children: ReactNode }) {
       checking = true;
       try {
         const params = new URLSearchParams({ user_id: riderId });
-        const response = await fetch(`/api/chat/channel?${params}`);
+        const response = await fetch(matchUrl(`/chat/channel?${params}`));
         const body: unknown = await response.json();
         if (!response.ok || stopped || !body || typeof body !== "object" || !("channel" in body)) {
           return;

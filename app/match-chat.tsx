@@ -14,6 +14,7 @@ import {
   Window,
   useCreateChatClient,
 } from "stream-chat-react";
+import { STREAM_API_KEY, matchUrl } from "./public-config";
 import "stream-chat-react/css/index.css";
 
 type Session = {
@@ -51,7 +52,7 @@ export default function MatchChat(props: MatchChatProps) {
     let mounted = true;
 
     (async () => {
-      const room = await fetch("/api/chat/channel", {
+      const room = await fetch(matchUrl("/chat/channel"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -85,21 +86,19 @@ export default function MatchChat(props: MatchChatProps) {
         user_id: props.userId,
         name: props.name,
       });
-      const tokenResponse = await fetch(`/api/token?${params}`);
+      const tokenResponse = await fetch(matchUrl(`/chat/token?${params}`));
       if (!tokenResponse.ok) throw new Error("Couldn't sign you in to chat.");
       const body: unknown = await tokenResponse.json();
       if (
         !body ||
         typeof body !== "object" ||
         !("chatToken" in body) ||
-        !("apiKey" in body) ||
-        typeof body.chatToken !== "string" ||
-        typeof body.apiKey !== "string"
+        typeof body.chatToken !== "string"
       ) {
         throw new Error("Couldn't sign you in to chat.");
       }
       if (!mounted) return;
-      setSession({ apiKey: body.apiKey, token: body.chatToken });
+      setSession({ apiKey: STREAM_API_KEY, token: body.chatToken });
     })().catch((cause: unknown) => {
       if (!mounted) return;
       setError(cause instanceof Error ? cause.message : "Couldn't open the chat.");
@@ -269,7 +268,7 @@ function EndChat({
   async function end() {
     setPending(true);
     setError(null);
-    const response = await fetch("/api/chat/channel", {
+    const response = await fetch(matchUrl("/chat/channel"), {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ channelId, userId }),
