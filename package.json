@@ -9,9 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "firebase": "^13.0.0",
     "next": "16.4.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "socket.io-client": "^4.8.4",
+    "stream-chat": "^9.54.0",
+    "stream-chat-react": "^14.13.2"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
