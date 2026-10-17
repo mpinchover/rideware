@@ -271,9 +271,7 @@ export default function RideForm() {
               {placeLabel(ride.you.city, ride.you.state)}
             </h2>
             <p className="mt-4 text-[15px] leading-6 text-[#6f695f]">
-              {ride.you.name}, keep this tab open. You&apos;ll be paired with someone who
-              selected {ride.you.airport} and {placeLabel(ride.you.city, ride.you.state)}.
-              Leaving releases your spot.
+              Finding a rideshare. Do not close this tab.
             </p>
           </div>
         )}
