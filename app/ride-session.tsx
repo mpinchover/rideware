@@ -48,7 +48,12 @@ type RideSessionValue = {
   error: string | null;
   setError: (message: string | null) => void;
   submitting: boolean;
-  join: (city: string, state: string) => void;
+  join: (place: {
+    city: string;
+    state: string;
+    latitude: number;
+    longitude: number;
+  }) => void;
   match: MatchPayload | null;
   chatKnown: boolean;
   authReady: boolean;
@@ -96,6 +101,8 @@ export type PendingSearch = {
   airport: string;
   city: string;
   state: string;
+  latitude: number;
+  longitude: number;
 };
 
 export function savePendingSearch(search: PendingSearch) {
@@ -115,17 +122,23 @@ export function readPendingSearch(): PendingSearch | null {
     const airport = "airport" in parsed ? parsed.airport : null;
     const city = "city" in parsed ? parsed.city : null;
     const state = "state" in parsed ? parsed.state : null;
+    const latitude = "latitude" in parsed ? parsed.latitude : null;
+    const longitude = "longitude" in parsed ? parsed.longitude : null;
     if (
       typeof airport !== "string" ||
       !/^[A-Z]{3}$/.test(airport) ||
       typeof city !== "string" ||
       !city.trim() ||
       typeof state !== "string" ||
-      !state.trim()
+      !state.trim() ||
+      typeof latitude !== "number" ||
+      typeof longitude !== "number" ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
     ) {
       return null;
     }
-    return { airport, city: city.trim(), state: state.trim() };
+    return { airport, city: city.trim(), state: state.trim(), latitude, longitude };
   } catch {
     return null;
   }
@@ -496,17 +509,19 @@ export default function RideSession({ children }: { children: ReactNode }) {
     }
   }
 
-  function join(city: string, state: string) {
+  function join(place: { city: string; state: string; latitude: number; longitude: number }) {
     const trimmed = name.trim();
-    const place = city.trim();
-    const region = state.trim();
+    const city = place.city.trim();
+    const region = place.state.trim();
     if (
       pathname !== "/" ||
       !userId ||
       trimmed.length === 0 ||
       airport.length !== 3 ||
-      place.length === 0 ||
-      region.length === 0
+      city.length === 0 ||
+      region.length === 0 ||
+      !Number.isFinite(place.latitude) ||
+      !Number.isFinite(place.longitude)
     ) {
       return;
     }
@@ -531,8 +546,10 @@ export default function RideSession({ children }: { children: ReactNode }) {
       socket.emit("join", {
         name: trimmed,
         airport,
-        city: place,
+        city,
         state: region,
+        latitude: place.latitude,
+        longitude: place.longitude,
         userId,
       });
     });

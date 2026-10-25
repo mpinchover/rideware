@@ -2,9 +2,8 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { useRideSession, type Destination, readPendingSearch, clearPendingSearch, savePendingSearch } from "./ride-session";
-
-const SELECT_MILES = 40;
+import { useRideSession, readPendingSearch, clearPendingSearch, savePendingSearch } from "./ride-session";
+import { loadNeighborhoods, suggestNeighborhoods, type Neighborhood } from "./neighborhood-list";
 
 function placeLabel(city: string, state: string) {
   return `${city}, ${state}`;
@@ -17,9 +16,30 @@ export default function RideForm() {
   const resumeStarted = useRef(false);
 
   const [destinationQuery, setDestinationQuery] = useState("");
-  const [selected, setSelected] = useState<Destination | null>(null);
+  const [selected, setSelected] = useState<Neighborhood | null>(null);
+  const [places, setPlaces] = useState<Neighborhood[]>([]);
+  const [loadingPlaces, setLoadingPlaces] = useState(true);
   const [listOpen, setListOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    loadNeighborhoods()
+      .then((next) => {
+        if (!active) return;
+        setPlaces(next);
+        setLoadingPlaces(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setPlaces([]);
+        setLoadingPlaces(false);
+        ride.setError("Couldn't load neighborhoods.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [ride.setError]);
 
   useEffect(() => {
     setSelected(null);
@@ -27,26 +47,16 @@ export default function RideForm() {
     setListOpen(false);
   }, [ride.airport]);
 
-  const choices = useMemo(
-    () => ride.destinations.filter((destination) => destination.miles <= SELECT_MILES),
-    [ride.destinations],
+  const suggestions = useMemo(
+    () => suggestNeighborhoods(places, destinationQuery),
+    [places, destinationQuery],
   );
-
-  const suggestions = useMemo(() => {
-    const query = destinationQuery.trim().toLowerCase();
-    if (!query) return [];
-    return choices
-      .filter((destination) =>
-        placeLabel(destination.city, destination.state).toLowerCase().includes(query),
-      )
-      .slice(0, 8);
-  }, [choices, destinationQuery]);
 
   const highlighted = suggestions.length
     ? Math.min(activeIndex, suggestions.length - 1)
     : 0;
 
-  function choose(destination: Destination) {
+  function choose(destination: Neighborhood) {
     setSelected(destination);
     setDestinationQuery(placeLabel(destination.city, destination.state));
     setListOpen(false);
@@ -89,7 +99,7 @@ export default function RideForm() {
     if (resumeStarted.current) return;
     resumeStarted.current = true;
     clearPendingSearch();
-    ride.join(pending.city, pending.state);
+    ride.join(pending);
   }, [
     ride.authReady,
     ride.userId,
@@ -105,11 +115,17 @@ export default function RideForm() {
     event.preventDefault();
     if (!selected || ride.airport.length !== 3) return;
     if (!ride.userId) {
-      savePendingSearch({ airport: ride.airport, city: selected.city, state: selected.state });
+      savePendingSearch({
+        airport: ride.airport,
+        city: selected.city,
+        state: selected.state,
+        latitude: selected.latitude,
+        longitude: selected.longitude,
+      });
       router.push("/login");
       return;
     }
-    ride.join(selected.city, selected.state);
+    ride.join(selected);
   }
 
   const canSubmit =
@@ -119,8 +135,7 @@ export default function RideForm() {
     selected !== null &&
     !ride.submitting;
 
-  const destinationReady =
-    ride.airport.length === 3 && !ride.loadingPlaces && choices.length > 0;
+  const destinationReady = ride.airport.length === 3 && !loadingPlaces && places.length > 0;
 
   return (
     <main className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-5 py-16">
@@ -180,17 +195,17 @@ export default function RideForm() {
                         : undefined
                     }
                     value={destinationQuery}
-                    disabled={!destinationReady}
+                    disabled={ride.airport.length !== 3 || loadingPlaces}
                     placeholder={
-                      ride.loadingPlaces
-                        ? "Finding nearby cities…"
-                        : "Choose a nearby city."
+                      loadingPlaces
+                        ? "Loading neighborhoods…"
+                        : "A neighborhood, like Upper West Side"
                     }
                     onChange={(event) => {
                       const value = event.target.value;
                       setDestinationQuery(value);
                       setSelected(null);
-                      setListOpen(value.trim().length > 0);
+                      setListOpen(value.trim().length >= 3);
                       setActiveIndex(0);
                     }}
                     onBlur={() => setListOpen(false)}
@@ -205,12 +220,13 @@ export default function RideForm() {
                       className="absolute top-[calc(100%+0.5rem)] z-10 max-h-64 w-full overflow-auto rounded-2xl bg-white py-1 shadow-[0_16px_40px_-20px_rgba(28,25,23,0.45)] ring-1 ring-black/10"
                     >
                       {suggestions.length === 0 ? (
-                        <li className="px-4 py-3 text-sm text-[#8a8478]">
-                          No matching cities within 40 miles.
-                        </li>
+                        <li className="px-4 py-3 text-sm text-[#8a8478]">No close matches.</li>
                       ) : (
                         suggestions.map((destination, index) => (
-                          <li key={`${destination.city}-${destination.state}`} role="presentation">
+                          <li
+                            key={`${destination.city}-${destination.state}-${destination.latitude}-${destination.longitude}`}
+                            role="presentation"
+                          >
                             <button
                               id={`${listId}-${index}`}
                               type="button"
@@ -235,11 +251,6 @@ export default function RideForm() {
                   )}
                 </div>
               </label>
-              {ride.airport.length === 3 && !ride.loadingPlaces && choices.length === 0 && !ride.error && (
-                <span className="text-xs text-[#8a8478]">
-                  No cities within 40 miles of {ride.airport}.
-                </span>
-              )}
             </div>
 
             {ride.error && (
